@@ -1,6 +1,6 @@
 # diligence-bench
 
-A rework in progress of an agentic financial diligence benchmark.
+A rewrite in progress of an agentic financial diligence benchmark.
 
 ## Quickstart
 
