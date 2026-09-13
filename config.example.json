@@ -1,0 +1,6 @@
+{
+  "region": "us-east-1",
+  "modelId": "set-a-tool-capable-deepseek-model-or-inference-profile-after-verification",
+  "runsDirectory": "/absolute/path/to/diligence-runs",
+  "secUserAgent": "Your Name your-email@example.com"
+}

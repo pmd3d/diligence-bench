@@ -1,3 +1,4 @@
+# Local environment and Python tooling
 .env
 .venv/
 __pycache__/
@@ -5,9 +6,40 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .ty/
+
+# OS files
 .DS_Store
+
+# Project data and generated results
 datasets/*
 !datasets/.gitkeep
 results/*
 !results/.gitkeep
 logs/
+runs/
+
+# F#/.NET build output
+**/bin/
+**/obj/
+artifacts/
+
+# IDE and user-specific files
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# NuGet packages and package artifacts
+packages/
+*.nupkg
+*.snupkg
+
+# Test and coverage output
+TestResults/
+coverage/
+coverage.*
+*.coverage
+*.coveragexml

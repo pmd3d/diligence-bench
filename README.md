@@ -1,109 +1,43 @@
 # diligence-bench
 
-Public benchmark runner for [Diligence Bench](https://huggingface.co/datasets/tldc/diligence-bench)
-— an agentic financial diligence benchmark.
-
-Modal is no longer included in this project's installation or example environment.
-The existing Python `loop`, `sandbox`, and `finance` agents still depend on it and
-cannot run without it; this includes the default `eval --agent finance` path in
-the legacy examples below. Existing vendor CLI adapters do not require Modal.
-The [F# / .NET 10 plan](docs/fsharp-dotnet10-migration-plan.md) describes the
-replacement stock-research workflow using Bedrock with manual review and no Modal.
-That replacement has not been implemented yet.
-
-The repo has two outputs:
-
-- A Harbor task suite under `datasets/diligence-bench/`.
-- A reference eval runner built on `verifiers.v1.Harness`. It supports both
-  OpenAI Agents SDK `SandboxAgent`s on Modal (under `agents/`) and vendor CLI
-  agents like Claude Code and Codex (under `cli_agents/`).
+A rework in progress of an agentic financial diligence benchmark.
 
 ## Quickstart
 
-```bash
-uv sync
-cp .env.example .env
-uv run diligence-bench build-tasks --examples 5
-uv run diligence-bench eval --models openai/gpt-5.5 --examples 5
-```
-
-Required for real eval runs:
-
-- `OPENAI_API_KEY` or `OPENROUTER_API_KEY` for the model and judge.
-- `EXA_API_KEY` for web search.
-- `SEC_USER_AGENT` with a contact address for SEC EDGAR requests.
-
-## Commands
+## Build and test
 
 ```bash
-uv run diligence-bench build-tasks --out datasets/diligence-bench --examples 5
-uv run diligence-bench eval --models openai/gpt-5.5,anthropic/claude-opus-4.7
+dotnet restore Diligence.sln
+dotnet build Diligence.sln --no-restore
+dotnet test Diligence.sln --no-build
 ```
 
-`build-tasks` converts HuggingFace rows into Harbor task directories. `eval`
-reads those same task directories, runs the selected agent, writes per-example
-JSON under `results/<run-id>/`, and appends aggregate rows to
-`results/ablations.csv`.
-
-### Picking an agent
-
-`--agent` defaults to `finance` (the OpenAI Agents SDK reference agent on
-Modal). To run a vendor CLI agent instead:
+## Publish and install
 
 ```bash
-uv run diligence-bench eval --agent claude-code --models anthropic/claude-opus-4.7
-uv run diligence-bench eval --agent codex --models openai/gpt-5.5
-uv run diligence-bench eval --agent gemini --models google/gemini-3-pro
+./scripts/publish.sh
+diligence tools
 ```
 
-### Sweeping models
+See [docs/local-installation.md](docs/local-installation.md) for AWS profile setup, secret configuration, durable storage, live and replayed runs, interruption/restart, reopening reports, backup, upgrades, and removal.
 
-Pass a comma-separated list to `--models`. Each model runs as its own variant
-under the same `run-id` and gets its own row in `ablations.csv`:
+Rebuild or locate a run's standalone inspection report with:
 
 ```bash
-uv run diligence-bench eval \
-  --agent finance \
-  --models openai/gpt-5.5,anthropic/claude-opus-4.7,google/gemini-3-pro \
-  --ablation-name model-sweep-2026-06
+dotnet run --project src/Diligence.Cli -- show --run <run-id> --runs-dir ./runs
 ```
 
-### Sampling overrides
-
-Override sampling for every model in the run with `--temperature`,
-`--reasoning-effort` (`minimal|low|medium|high`), or `--verbosity`
-(`low|medium|high`). Defaults are resolved per-model in `sampling.py`.
-
-### Other useful flags
-
-- `--examples N` — cap the number of tasks (default: all).
-- `--concurrency N` — parallel tasks per model (default: 3).
-- `--judge-model` — override the rubric judge model.
-- `--tasks-dir` — read tasks from a non-default directory.
-- `--ablation-name` — label this run in `ablations.csv` (defaults to run id).
-- `--output` — results root (default: `results`).
-
-### Resuming a run
-
-Pass `--run-id <id>` to reuse an existing run directory. Tasks that already
-have a non-error score JSON under `results/<id>/<variant>/scores/` are skipped
-and reported as `skip` in the progress log; remaining tasks run normally:
+Restart an interrupted or failed run as a new attempt while preserving the original artifacts:
 
 ```bash
-uv run diligence-bench eval --models openai/gpt-5.5 --run-id 2026-05-18T05-13-10-926339-b31e96b3
-# Resuming run 2026-05-18T05-13-10-926339-b31e96b3 [finance__openai_gpt-5.5]: 23/50 already complete, 27 remaining
-#   [############------------------] 23/50 (46%)
-# skip dilbench-rubicon-... [finance__openai_gpt-5.5]: existing score 0.421
+dotnet run --project src/Diligence.Cli -- restart --run <run-id> --runs-dir ./runs --replay-response sample-response.md
 ```
 
-Per-task progress is rendered to stderr.
+Open the printed `report.html` path in a browser. The report keeps the original question, memo or partial output, source links and saved excerpts, expandable tool activity, errors, status, timing, and token usage together. To print only a completed memo, add `--answer`.
 
-## Development
+Prompts remain editable: revise `runs/<run-id>/prompt.md`, then pass it as `--prompt-file` to a new `research` command. Every attempt gets a fresh run directory, so the earlier report stays intact. On a budget limit, provider error, or Ctrl+C, the CLI records an incomplete or failed manifest and generates a report from the activity and evidence already saved.
 
-```bash
-uv run pytest
-uv run ruff check src tests
-```
+`config.example.json` documents the local defaults. Set `DILIGENCE_CONFIG` to avoid repeating `--config`. `us-east-1` is the default Region. Before enabling live inference, choose a DeepSeek model ID or inference profile that your AWS account can access and confirm supports Bedrock Converse tool use. AWS credentials remain in the standard AWS credential chain, never in this configuration file.
 
 ## License
 

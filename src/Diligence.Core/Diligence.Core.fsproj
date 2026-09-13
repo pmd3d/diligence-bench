@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup><PackageReference Include="FSharp.Core" /></ItemGroup>
+  <ItemGroup>
+    <Compile Include="Domain.fs" />
+    <Compile Include="Configuration.fs" />
+    <Compile Include="Prompts.fs" />
+    <Compile Include="ToolLoop.fs" />
+  </ItemGroup>
+</Project>

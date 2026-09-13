@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="FSharp.Core" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio"><PrivateAssets>all</PrivateAssets></PackageReference>
+    <ProjectReference Include="../../src/Diligence.Core/Diligence.Core.fsproj" />
+    <ProjectReference Include="../../src/Diligence.Infrastructure/Diligence.Infrastructure.fsproj" />
+  </ItemGroup>
+  <ItemGroup><Compile Include="FoundationTests.fs" /></ItemGroup>
+</Project>

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Diligence.Core/Diligence.Core.fsproj" />
+    <PackageReference Include="AWSSDK.BedrockRuntime" />
+    <PackageReference Include="AWSSDK.Core" />
+  </ItemGroup>
+  <ItemGroup><Compile Include="RunStorage.fs" /><Compile Include="Report.fs" /><Compile Include="SecEdgar.fs" /><Compile Include="ResearchTools.fs" /><Compile Include="Bedrock.fs" /></ItemGroup>
+</Project>
