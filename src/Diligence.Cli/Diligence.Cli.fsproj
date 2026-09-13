@@ -9,7 +9,6 @@
   <ItemGroup>
     <None Include="../../assets/prompts/stock-review.md" Link="examples/stock-review.md" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../config.example.json" Link="config.example.json" CopyToPublishDirectory="PreserveNewest" />
-    <None Include="../../README-fsharp.md" Link="README.md" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup><Compile Include="Program.fs" /></ItemGroup>
 </Project>

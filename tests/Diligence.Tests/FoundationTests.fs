@@ -96,6 +96,80 @@ module FoundationTests =
         Assert.Equal<string list>([ "sigv4" ], config.AuthSchemePreference |> Seq.toList)
 
     [<Fact>]
+    let ``Bedrock maps tool definitions to Converse tool configuration`` () =
+        let definition = {
+            Name = "sec_filings"
+            Description = "List SEC filings."
+            InputSchema = "{\"type\":\"object\",\"properties\":{\"ticker\":{\"type\":\"string\"}},\"required\":[\"ticker\"]}"
+        }
+        let configuration = Bedrock.toolConfiguration [ definition ]
+        let tool = Assert.Single(configuration.Tools).ToolSpec
+        Assert.Equal("sec_filings", tool.Name)
+        Assert.Equal("List SEC filings.", tool.Description)
+        Assert.True(tool.InputSchema.Json.IsDictionary())
+        let schema = tool.InputSchema.Json.AsDictionary()
+        Assert.Equal("object", schema["type"].AsString())
+
+    [<Fact>]
+    let ``Bedrock parses native tool use and token usage`` () =
+        let input = Amazon.Runtime.Documents.Document.FromObject(dict [ "ticker", box "MSFT" ])
+        let response = Amazon.BedrockRuntime.Model.ConverseResponse(
+            Output = Amazon.BedrockRuntime.Model.ConverseOutput(
+                Message = Amazon.BedrockRuntime.Model.Message(
+                    Role = Amazon.BedrockRuntime.ConversationRole.Assistant,
+                    Content = Collections.Generic.List<Amazon.BedrockRuntime.Model.ContentBlock>([
+                        Amazon.BedrockRuntime.Model.ContentBlock(Text = "Checking filings")
+                        Amazon.BedrockRuntime.Model.ContentBlock(ToolUse = Amazon.BedrockRuntime.Model.ToolUseBlock(ToolUseId = "call-1", Name = "sec_filings", Input = input))
+                    ]))),
+            Usage = Amazon.BedrockRuntime.Model.TokenUsage(InputTokens = Nullable 11, OutputTokens = Nullable 7))
+        let turn = Bedrock.modelTurn response
+        Assert.Equal(Some "Checking filings", turn.Text)
+        let call = Assert.Single(turn.ToolRequests)
+        Assert.Equal("call-1", call.Id)
+        Assert.Equal("sec_filings", call.Name)
+        Assert.Equal("{\"ticker\":\"MSFT\"}", call.Arguments)
+        Assert.Equal(Some 11, turn.InputTokens)
+        Assert.Equal(Some 7, turn.OutputTokens)
+
+    [<Fact>]
+    let ``Bedrock maps tool outputs to user tool-result blocks`` () =
+        let message = Bedrock.toolResultMessage [ { ToolUseId = "call-1"; Content = "{\"filings\":[]}"; IsError = false } ]
+        Assert.Equal(Amazon.BedrockRuntime.ConversationRole.User, message.Role)
+        let result = Assert.Single(message.Content).ToolResult
+        Assert.Equal("call-1", result.ToolUseId)
+        Assert.Equal("{\"filings\":[]}", Assert.Single(result.Content).Text)
+
+    [<Fact>]
+    let ``Bedrock parses DeepSeek text tool calls instead of saving them as an answer`` () =
+        let text = """Let me check.\n<sec_calls><sec_call><function>sec_filings</function><params>{"ticker":"MSFT"}</params></sec_call></sec_calls>"""
+        let call = Assert.Single(Bedrock.textToolRequests text)
+        Assert.StartsWith("text-call-1-", call.Id)
+        Assert.Equal("sec_filings", call.Name)
+        Assert.Equal("{\"ticker\":\"MSFT\"}", call.Arguments)
+
+    [<Fact>]
+    let ``Bedrock forwards malformed text-tool arguments so the tool loop can report the error`` () =
+        let text = "<tool_calls><tool_call><id>bad-1</id><function>sec_filings</function><params>{bad json}</params></tool_call></tool_calls>"
+        let call = Assert.Single(Bedrock.textToolRequests text)
+        Assert.Equal("bad-1", call.Id)
+        Assert.Equal("{bad json}", call.Arguments)
+
+    [<Fact>]
+    let ``Bedrock selects the text protocol for DeepSeek runtime models`` () =
+        Assert.True(Bedrock.usesTextToolProtocol "deepseek.v3.2")
+        Assert.True(Bedrock.usesTextToolProtocol "us.deepseek.r1-v1:0")
+        Assert.False(Bedrock.usesTextToolProtocol "cohere.command-r-v1:0")
+
+    [<Fact>]
+    let ``Bedrock text tool results preserve ids errors and content`` () =
+        let message = Bedrock.textToolResultMessage [ { ToolUseId = "call-7"; Content = "failed <unsafe>"; IsError = true } ]
+        let text = Assert.Single(message.Content).Text
+        Assert.Contains("<tool_results>", text)
+        Assert.Contains("\"tool_use_id\":\"call-7\"", text)
+        Assert.Contains("\"is_error\":true", text)
+        Assert.Contains("\\u003Cunsafe\\u003E", text)
+
+    [<Fact>]
     let ``replay response is returned as a memo`` () = task {
         let root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString())
         let response = Path.Combine(root, "response.md")
