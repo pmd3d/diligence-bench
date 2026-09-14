@@ -12,7 +12,7 @@ module AppConfig =
         Region = "us-east-1"; ModelId = None
         RunsDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "diligence-runs")
         Temperature = None
-        Limits = { MaximumTurns = 12; MaximumToolCalls = 24; MaximumFetchedBytes = 2_000_000; ElapsedTimeLimit = TimeSpan.FromMinutes 15.0 }
+        Limits = { MaximumTurns = 24; MaximumToolCalls = 24; MaximumFetchedBytes = 8_000_000; ElapsedTimeLimit = TimeSpan.FromMinutes 15.0 }
         SecUserAgent = Environment.GetEnvironmentVariable("SEC_USER_AGENT") |> Option.ofObj
         ExaApiKey = Environment.GetEnvironmentVariable("EXA_API_KEY") |> Option.ofObj
     }
