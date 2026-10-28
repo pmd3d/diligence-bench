@@ -49,10 +49,12 @@ module FoundationTests =
     [<Fact>]
     let ``F sharp registry exposes the complete SEC EDGAR tool set`` () =
         use client = new HttpClient(new FixtureHttpHandler(Map.empty))
-        let names = SecEdgarTools(AppConfig.defaults, client).All |> List.map (fun tool -> tool.Definition.Name) |> Set.ofList
-        let expected = Set.ofList [ "sec_filings"; "sec_filing_content"; "sec_financials"; "sec_resolve_company"; "sec_filing_search" ]
+        let run = RunStorage.create(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()))
+        let tools = SecEdgarTools(AppConfig.defaults, client).All @ SecEdgarEtfHoldingsTools(run, AppConfig.defaults, client).All
+        let names = tools |> List.map (fun tool -> tool.Definition.Name) |> Set.ofList
+        let expected = Set.ofList [ "sec_filings"; "sec_filing_content"; "sec_financials"; "sec_resolve_company"; "sec_filing_search"; "sec_etf_holdings" ]
         Assert.True((expected = names), $"Unexpected SEC EDGAR tools: {names}")
-        SecEdgarTools(AppConfig.defaults, client).All
+        tools
         |> List.iter (fun tool ->
             use schema = JsonDocument.Parse(tool.Definition.InputSchema)
             Assert.Equal(JsonValueKind.Object, schema.RootElement.ValueKind))
@@ -87,6 +89,35 @@ module FoundationTests =
         let! financials = execute "sec_financials" "{\"identifier\":\"320193\",\"statement\":\"balance_sheet\"}"
         Assert.Contains("364980000000", financials)
         Assert.Contains("Assets", financials)
+    }
+
+    [<Fact>]
+    let ``SEC ETF holdings tool resolves a fund ticker and parses NPORT-P holdings`` () = task {
+        let fundTickers = """{"fields":["cik","seriesId","symbol"],"data":[[1100663,"S000035393","IVV"]]}"""
+        let submissions = """{"name":"iShares Trust","filings":{"recent":{"form":["NPORT-P"],"filingDate":["2026-10-23"],"reportDate":["2026-08-31"],"accessionNumber":["0001004726-26-010027"],"primaryDocument":["0001004726-26-010027.htm"]}}}"""
+        let index = """{"directory":{"item":[{"name":"0001004726-26-010027.htm"},{"name":"primary_doc.xml"}]}}"""
+        let xml = """<edgarSubmission><formData><genInfo><seriesId>S000035393</seriesId><seriesName>iShares Core S&amp;P 500 ETF</seriesName><repPdDate>2026-08-31</repPdDate></genInfo><fundInfo><totAssets>500000</totAssets><netAssets>499000</netAssets></fundInfo><invstOrSecs><invstOrSec><name>Example Issuer</name><title>Common Stock</title><balance>100</balance><units>NS</units><valUSD>2500</valUSD><pctVal>0.5</pctVal><assetCat>EC</assetCat><invCountry>US</invCountry><identifiers><ticker value="EXM" /></identifiers></invstOrSec></invstOrSecs></formData></edgarSubmission>"""
+        let responses = Map [
+            "/files/company_tickers_mf.json", fundTickers
+            "/submissions/CIK0001100663.json", submissions
+            "/Archives/edgar/data/1100663/000100472626010027/index.json", index
+            "/Archives/edgar/data/1100663/000100472626010027/primary_doc.xml", xml
+        ]
+        use client = new HttpClient(new FixtureHttpHandler(responses))
+        let config = { AppConfig.defaults with SecUserAgent = Some "Diligence Tests tests@example.com" }
+        let run = RunStorage.create(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()))
+        let tool = Assert.Single(SecEdgarEtfHoldingsTools(run, config, client).All)
+        let! result = tool.Execute("{\"ticker\":\"IVV\"}", CancellationToken.None)
+        Assert.Contains("iShares Core S\\u0026P 500 ETF", result)
+        Assert.Contains("\"series_id\":\"S000035393\"", result)
+        Assert.Contains("\"filing_date\":\"2026-10-23\"", result)
+        Assert.Contains("0001004726-26-010027", result)
+        Assert.Contains("https://www.sec.gov/Archives/edgar/data/1100663/000100472626010027/primary_doc.xml", result)
+        Assert.Contains("Example Issuer", result)
+        Assert.Contains("2026-08-31", result)
+        Assert.Contains("\"total_holdings\":1", result)
+        Assert.Contains("\"source_path\":\"evidence/", result)
+        Assert.Single(Directory.GetFiles(Path.Combine(run.Path, "evidence"))) |> ignore
     }
 
     [<Fact>]
